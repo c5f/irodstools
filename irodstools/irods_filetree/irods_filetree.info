@@ -1,0 +1,5 @@
+name = "iRODS Filetree"
+description = "Retrieves the directory of an iRODS folder as JSON"
+package = "iRODS Tools"
+core = 7.x
+version = "7.x-0.1"

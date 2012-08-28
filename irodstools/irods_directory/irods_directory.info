@@ -1,0 +1,10 @@
+; $Id$
+name = "iRODS Directory"
+description = "A textfield widget that allows the use of an iRODS filetree."
+package = "iRODS Tools"
+core = 7.x
+version = 7.x-1.0
+dependencies[] = irods_filetree
+dependencies[] = field_ui
+
+scripts[] = irods_directory.js

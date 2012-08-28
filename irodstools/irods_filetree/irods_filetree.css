@@ -1,0 +1,12 @@
+
+.block-irods-filetree .filetree_fetch_button {
+  display:inline;
+  background:#888;
+  padding:4px;
+  border: 1px solid #bbb;
+  border-radius:4px;
+}
+
+.block-irods-filetree .filetree {
+  display:none;
+}

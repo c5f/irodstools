@@ -1,0 +1,65 @@
+<?php 
+// $Id$
+
+/**
+ * @file
+ * Provides a field for the path of an iRODS directory.
+ */
+
+/**
+ * Implementation of hook_field_info().
+ */
+function irods_directory_field_info() {
+  return array(
+    'irods_directory_field' => array(
+      'label' => t('iRODS Directory'),
+      'description' => t('iRODS Directory Path'),
+      'default_widget' => 'irods_directory_field_widget',
+      'default_formatter' => 'irods_directory_field_formatter'
+    )
+  );
+}
+
+/**
+ * Implementation of hook_field_widget_info().
+ */
+function irods_directory_field_widget_info() {
+  return array(
+    'irods_directory_field_widget' => array(
+      'label' => t('Default'),
+      'field types' => array('irods_directory_field')
+    )
+  );
+}
+
+/**
+ * Implementation of hook_field_widget_form().
+ */
+function irods_directory_field_widget_form(&$form, &$form_state, $field, 
+  $instance, $langcode, $items, $delta, $element) {
+
+  $path = drupal_get_path('module', 'irods_directory');
+  drupal_add_css($path . '/irods_directory.css');
+  
+  $path = drupal_get_path('module', 'irods_filetree');
+  drupal_add_js($path . '/irods_filetree.js');
+
+  $required = $element['#required'];
+  $item =& $items[$delta];
+
+  $element['irods_path'] = array(
+    '#title' => t('iRODS Data Path'),
+    '#type' => 'textfield',
+    '#required' => $required,
+    '#default_value' => isset($item['irods_path']) ? $item['irods_path'] : ''
+  );
+
+  return $element;
+}
+
+/**
+ * Implementation of hook_field_is_empty().
+ */
+function irods_directory_field_is_empty($item, $field) {
+  return !isset($item['irods_path']);
+}

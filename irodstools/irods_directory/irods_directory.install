@@ -1,0 +1,18 @@
+<?php 
+// $Id$
+
+/**
+ * Implementation of hook_field_schema().
+ */
+function irods_directory_field_schema($field) {
+  $columns = array(
+    'irods_path' => array(
+      'type' => 'varchar', 'length' => 1024, 'not null' => TRUE
+    )
+  );
+
+  return array(
+    'columns' => $columns,
+    'indexes' => array()
+  );
+}

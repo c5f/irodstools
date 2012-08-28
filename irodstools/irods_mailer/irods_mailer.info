@@ -1,0 +1,7 @@
+; $Id$
+name = "iRODS Mailer"
+description = "Notification Mailer for the iRODS Monitor"
+package = "iRODS Tools"
+core = 7.x
+version = "7.x-0.1"
+dependencies[] = messaging

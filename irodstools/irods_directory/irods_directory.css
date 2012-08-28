@@ -1,0 +1,10 @@
+
+/* Form styling */
+
+#field-irods-directory-values input {
+
+}
+
+#field-irods-directory-values input:focus {
+  background:#900;
+}
