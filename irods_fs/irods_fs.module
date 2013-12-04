@@ -1,0 +1,7 @@
+<?php
+
+
+
+function irods_fs_help($path, $arg) {
+    return '<p>' . t("Help message") . '</p>';
+}
