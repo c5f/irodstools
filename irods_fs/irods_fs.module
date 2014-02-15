@@ -1,7 +1,189 @@
 <?php
 
+/* should this even be done in a non-OO module?
 
+//You will need to set allow_url_fopen to on your PHP settings.
+
+// in which version was this deprecated? 5.3?
+ini_set('allow_call_time_pass_reference', 1);
+
+$version_parts = explode('.', PHP_VERSION);
+//ignore deprecation warnings in PHP 5.3 and above
+if ($version_parts[1] >= 3) {
+    error_reporting(E_ALL ^ (E_NOTICE | E_WARNING | E_DEPRECATED));
+}
+/*
+
+/* prods should be installed in /sites/all/library/prods */
+if ( ($library = libraries_load('prods')) && !empty($library['loaded']) ) {
+
+
+}
+
+/**
+ * @file
+ * Provides iRODS stream wrapper
+ */
+
+/**
+ * Implements hook_stream_wrappers().
+ *
+ * init a stream wrapper for iRODS, implemented by IrodsStreamWrapper.php
+ */
+function irods_fsstream_wrappers() {
+  return array(
+    'rods' => array(
+      'name' => 'iRODS',
+      'class' => 'IrodsStreamWrapper',
+      'description' => t('iRODS Data Storage'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function irods_fsmenu() {
+  $items = array();
+
+  $items['admin/config/media/irods'] = array(
+    'title' => 'iRODS Data Storage',
+    'description' => 'Configure your iRODS credentials and connection',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('irods_fs_admin'),
+    'access arguments' => array('access administration pages'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_help().
+ */
+function irods_fs_help($path, $arg) {
+    switch ($path) {
+        case 'admin/config/media/irods':
+            return '<p>' . t('') . '</p>';
+  }
+}
+
+/**
+ * Implements hook_admin().
+ */
+function irods_fs_admin() {
+    $form = array();
+
+    /*$form['irods_fs_schema'] = array(
+        '#type'           => 'textfield',
+        '#title'          => t('iRODS URL Schema'),
+        '#default_value'  => variable_get('irods_fs_schema', 'rods://'),
+        '#required'       => TRUE,
+    );*/
+
+    $form['irods_fs_username'] = array(
+        '#type'           => 'textfield',
+        '#title'          => t('iRODS Account Username'),
+        '#description'    => t(''),
+        '#default_value'  => variable_get('irods_fs_username', ''),
+        '#required'       => TRUE,
+      );
+
+    $form['irods_fs_password'] = array(
+        '#type'           => 'password',
+        '#title'          => t('iRODS Account Password'),
+        '#description'    => t(''),
+        '#default_value'  => variable_get('irods_fs_password', ''),
+        '#required'       => TRUE,
+    );
+
+    $form['irods_fs_host'] = array(
+        '#type'           => 'textfield',
+        '#title'          => t('iRODS Server Host'),
+        '#description'    => t('The domain at which the iRODS server resides; e.g. data.iplantcollaborative.org. No slashes are needed.'),
+        '#default_value'  => variable_get('irods_fs_host', ''),
+        '#required'       => TRUE,
+    );
+
+    $form['irods_fs_port'] = array(
+        '#type' => 'textfield',
+        '#title' => t('iRODS Server Port'),
+        '#description' => t(''),
+        '#default_value' => variable_get('irods_fs_port', '1247'),
+        '#required'       => TRUE,
+    );
+
+    $form['irods_fs_root'] = array(
+        '#type' => 'textfield',
+        '#title' => t('iRODS Server Root Path'),
+        '#description' => t('This is the path from the iRODS root to the user account under which images are stored; e.g. /iplant/home/username'),
+        '#default_value' => variable_get('irods_fs_root', ''),
+        '#required'       => TRUE,
+    );
+
+    return system_settings_form($form);
+}
+
+function irods_fs_admin_validate($form, &$form_state)
+{
+    $form = $form_state['values']['irods_fs'];
+
+    try {
+        // Testing...meh, somewhat unwieldy since passing params to the
+        // constructor would violate the Interface constraints.
+        $conn_str = 'rods://' . irods_fs_username . ':' . irods_fs_password . '@' .
+            irods_fs_host . ':' . irods_fs_port . '/' . irods_fs_root . '/';
+            
+        $rods = new IrodsStreamWrapper();
+
+        // Test initialization
+        /* __toString() is called here and assigned to rods */
+        $base_uri = print_r($rods, true);
+
+        /* test connection */
+        //@TODO      
+    }
+    catch(Exception $e) {
+      form_set_error('irods_fs', t('There was a problem using iRODS'));
+    }
+  }
+}
+
+
+/* $file and $source are both objects
+ *
+ * $file 	The newly copied file object.
+ * $source 	The original file before the copy.
+ */
+function hook_file_copy($file, $source)
+{
+    /* ignore files which are not cleared leaf images */
+    if ( ! is_managed_image($source->filename)) {
+        return;
+    }
+
+    // how do I get the file content?
+    $data = drupal_http_request($url);
+    //$file = file_save_data($data->data, $destination);
+
+    /* otherwise, save the managed image into iRODS. fopen wrappers must be enabled in PHP  */
+    // how do I get $user->name ?
+    if ( FALSE === $bytes_written = file_put_contents(
+        $irods_url . $user->name . '/' . $filename, $source->FILE_CONTENT)
+    ) {
+        // handle the failed writing of the file
+
+    }
+
+}
+function hook_file_delete() {}
+function hook_file_insert() {}
+function hook_file_download() {}
 
 function irods_fs_help($path, $arg) {
     return '<p>' . t("Help message") . '</p>';
+}
+
+function is_managed_image($filename)
+{
+    return true;
 }

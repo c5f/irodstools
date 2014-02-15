@@ -52,3 +52,7 @@ Session.vim
 .netrwhist
 *~
 /Components Architecture.ppt
+
+/irods_fs/StreamWrapperInterface.php
+/irods_fs/DrupalLocalStreamWrapper.php
+/irods_fs/DrupalStreamWrapperInterface.php
