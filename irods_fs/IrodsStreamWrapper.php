@@ -99,8 +99,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Gets the path that the wrapper is responsible for.
      *
-     * @return
-     *   String specifying the path.
+     * @return  String  specifying the path.
      */
     public function getDirectoryPath() {
         return $this->domain;
@@ -275,25 +274,29 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      */
     public function stream_open($uri, $mode, $options, &$opened_path)
     {
-        /* strip schema */
         $full_uri = $this->uri . str_replace('rods://', '', $uri);
             // $this->uri already has a trailing slash
-
-        /* get rid of tailing 'b', if any. */
-        //@TODO Why strip 'b'?
-        if ( ($mode{strlen($mode) - 1} == 'b') && (strlen($mode) > 1) ) {
-            $mode = substr($mode, 0, strlen($mode) - 1);
-        }
-
-        //@TODO Specify a resource in open()?
+        
+        /* 
+         * parse the url to pass to RODSAccount and ProdsFile, since 
+         * ProdsFile::fromUri() will not have all the needed permission rules
+         * firing on it; explicitly creating a RODSAccount then ProdsFile 
+         * does work...
+         */
+        $url_parts = parse_url($full_uri);
+                
         try {
-            $this->file = ProdsFile::fromURI($full_uri);
-            $this->file->open($mode);
-
-            /* set the position */
+            $this->account = new RODSAccount(
+                $url_parts['host'], $url_parts['port'], $url_parts['user'], $url_parts['pass']
+            );
+            $this->file = new ProdsFile($this->account, $url_parts['path']);
+            $this->file->open("w+");
+            
+            /* set the file's position */
             $this->position = 0;
 
             return TRUE;
+            
         } catch (Exception $e) {
             //@TODO use Drupal's native error handling
 
@@ -345,6 +348,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
             /* The new position after the bytes were written */
             $this->position = $this->file->tell();
 
+            //$this->file->close();
+
             return $bytes_written;
 
         } catch (Exception $e) {
@@ -358,20 +363,30 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Support for fclose().
      *
-     * @return bool 	For now, its always TRUE
+     * @return bool
      *
      * @see http://php.net/manual/en/streamwrapper.stream-close.php
      */
     public function stream_close()
     {
-        /* Deallocate any resources here. Since we don't have locking in this,
-         *   we don't need to force any unlocks here. */
-        $this->position = 0;
-        $this->file = null;
-        $this->dir = null;
+        try {
+            /* this is absolutely essential, else for a new file, iRODS will not 
+             * assign the RODSAdmin permission */
+            $this->file->close();
+            
+            /* Deallocate any resources */
+            $this->position = 0;
+            $this->file = null;
+            $this->dir = null;
 
-        /* Built-in PHP stream_close returns void, but Drupal needs it be TRUE */
-        return TRUE;
+            /* Built-in PHP stream_close returns void, but Drupal needs it be TRUE */
+            return TRUE;
+            
+        } catch (Exception $e) {
+            trigger_error("Got an exception: $e", E_USER_WARNING);
+            
+            return FALSE;
+        }
     }
 
 
@@ -564,7 +579,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         /* ProdsFile::unlink seems to return nothing, so wrap in a try/catch */
         try {
             /* unlink over streams don't call stream_open() first,
-             * so we need to init $this->file here. */
+             * so we need to init $this->file here. 
+             * See: https://bugs.php.net/bug.php?id=40459 */
+            //was fixed in PHP 5.4.7, and later (Sept, 2012), per PHP Changelog
+             
             $this->file = ProdsFile::fromURI($uri);
 
             $this->file->unlink();
@@ -591,6 +609,9 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      */
     public function rename($from_uri, $to_uri)
     {
+        /* __construct is not called prior to this method.
+        * See: https://bugs.php.net/bug.php?id=40459 */
+    
         return FALSE;
     }
 
@@ -732,7 +753,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     public function rmdir($uri, $options)
     {
         /* PHP won't not call stream_open() first for mkdir() and others,
-         * so we need to init $this->dir here. */
+         * so we need to init $this->dir here.
+         * See: https://bugs.php.net/bug.php?id=40459 */
         $uri = $this->getBaseURI() . str_replace('rods://', '', $uri);
             // $full_uri already has a trailing slash
 
@@ -901,18 +923,20 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
         /* if the domain is set in the site's config, get it; otherwise use the
          * built-in defaults above */
+         /*
         foreach ($irods as $variable) {
-            /* variables names are same as the array key names, but prefixed
-             * with 'irods_' in the config tables in the database.  */
+            * variables names are same as the array key names, but prefixed
+             * with 'irods_' in the config tables in the database.  *
             $variable_name = 'irods_' . $variable;
             if ( variable_get($variable_name, 0) ) {
                 $variable_value = variable_get($variable_name);
-                /* make sure its not empty */
+                * make sure its not empty *
                 if ( strlen($variable_value) > 0) {
                     $irods[$variable] = $variable_value;
                 }
             }
-       }
+        }
+        */
 
         /* set the class variable for other functions to reference */
         $base_uri =
