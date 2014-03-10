@@ -58,11 +58,21 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Object constructor
      *
-     * Sets the uri...?
+     * Sets the uri
      */
     public function __construct()
     {
         $this->uri = $this->getBaseURI();
+    }
+
+    /**
+     * Object destructor
+     *
+     * Called just prior to stream_flush()
+     */
+    public function __destruct()
+    {
+
     }
 
 
@@ -272,31 +282,32 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      *
      * @see http://php.net/manual/en/streamwrapper.stream-open.php
      */
-    public function stream_open($uri, $mode, $options, &$opened_path)
+    public function stream_open($uri, $mode = 'w+', $options, &$opened_path)
     {
         $full_uri = $this->uri . str_replace('rods://', '', $uri);
             // $this->uri already has a trailing slash
-        
-        /* 
-         * parse the url to pass to RODSAccount and ProdsFile, since 
+
+        /*
+         * parse the url to pass to RODSAccount and ProdsFile, since
          * ProdsFile::fromUri() will not have all the needed permission rules
-         * firing on it; explicitly creating a RODSAccount then ProdsFile 
+         * firing on it; explicitly creating a RODSAccount then ProdsFile
          * does work...
          */
         $url_parts = parse_url($full_uri);
-                
+
         try {
             $this->account = new RODSAccount(
                 $url_parts['host'], $url_parts['port'], $url_parts['user'], $url_parts['pass']
             );
             $this->file = new ProdsFile($this->account, $url_parts['path']);
-            $this->file->open("w+");
-            
+            //$this->file = ProdsFile::fromUri($full_uri);
+            $this->file->open($mode);
+
             /* set the file's position */
             $this->position = 0;
 
             return TRUE;
-            
+
         } catch (Exception $e) {
             //@TODO use Drupal's native error handling
 
@@ -321,7 +332,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
         try {
             $ret = $this->file->read($count);
-            $this->position=$this->file->tell();
+            $this->position = $this->file->tell();
 
             return $ret;
         } catch (Exception $e) {
@@ -370,10 +381,11 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     public function stream_close()
     {
         try {
-            /* this is absolutely essential, else for a new file, iRODS will not 
+            /* this is absolutely essential, else for a new file, iRODS will not
              * assign the RODSAdmin permission */
+            //if ( is_resource($this->file) && $this->file instanceof ProdsFile) {}
             $this->file->close();
-            
+
             /* Deallocate any resources */
             $this->position = 0;
             $this->file = null;
@@ -381,10 +393,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
             /* Built-in PHP stream_close returns void, but Drupal needs it be TRUE */
             return TRUE;
-            
+
         } catch (Exception $e) {
             trigger_error("Got an exception: $e", E_USER_WARNING);
-            
+
             return FALSE;
         }
     }
@@ -527,8 +539,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
 
     /**
-     * fflush() handler.  Please Note: This method must be called for any
-     * changes to be committed to the repository.
+     * fflush() handler.  "Please Note: This method must be called for any
+     * changes to be committed to the repository."
      *
      * However, the PRODS streamer seems to do nothing and writes directly,
      * instead of caching the stream to a buffer, so...
@@ -579,10 +591,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         /* ProdsFile::unlink seems to return nothing, so wrap in a try/catch */
         try {
             /* unlink over streams don't call stream_open() first,
-             * so we need to init $this->file here. 
+             * so we need to init $this->file here.
              * See: https://bugs.php.net/bug.php?id=40459 */
             //was fixed in PHP 5.4.7, and later (Sept, 2012), per PHP Changelog
-             
+
             $this->file = ProdsFile::fromURI($uri);
 
             $this->file->unlink();
@@ -611,7 +623,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     {
         /* __construct is not called prior to this method.
         * See: https://bugs.php.net/bug.php?id=40459 */
-    
+
         return FALSE;
     }
 
@@ -793,15 +805,15 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         $username = 'cldb';
         if ( variable_get('irods_username', 0) ) {
             $username = variable_get($variable_name);
-            
+
             /* make sure its not empty */
             if ( ! strlen($username) > 0) {
                 $username = 'cldb';
             }
         }
-        
+
         return '/iplant/home/'
-               . $username 
+               . $username
                . '/'
                . trim(str_replace('rods://', '', $uri), '/');
     }
@@ -821,14 +833,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     public function url_stat($uri, $flags)
     {
         /* __construct is NOT called prior to this function! */
-        $uri = $this->getBaseURI() . str_replace('rods://', '', $uri);
+        $full_uri = $this->getBaseURI() . str_replace('rods://', '', $uri);
             // $this->uri already has a trailing slash
-
-        /* try to see if its a file */
-        //@TODO we might do this by calling ProdsDir::findFiles() on the parent
-        //  and then seeing if basename($uri) is in the returned array?
-        // of "ProdsPath objects (ProdsFile or ProdsDir)", and see what type
-        // it is?
 
         try {
             /* stat over streams doesn't call stream_open() first,
@@ -923,20 +929,18 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
         /* if the domain is set in the site's config, get it; otherwise use the
          * built-in defaults above */
-         /*
         foreach ($irods as $variable) {
-            * variables names are same as the array key names, but prefixed
-             * with 'irods_' in the config tables in the database.  *
+          /* variables names are same as the array key names, but prefixed
+             * with 'irods_' in the config tables in the database. */
             $variable_name = 'irods_' . $variable;
             if ( variable_get($variable_name, 0) ) {
                 $variable_value = variable_get($variable_name);
-                * make sure its not empty *
+                /* make sure its not empty */
                 if ( strlen($variable_value) > 0) {
                     $irods[$variable] = $variable_value;
                 }
             }
         }
-        */
 
         /* set the class variable for other functions to reference */
         $base_uri =
