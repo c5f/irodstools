@@ -1,5 +1,10 @@
 name = Drupal Rods
 description = Provides transparent read/write access to files stored on the iRODS networked filesystem.
 core = 7.x
-version = "7.x-1.0
+version = "7.x-1.0"
 php = 5.2
+package = Media
+configure = admin/config/media/irods_fs
+
+files[] = irods_fs.module
+files[] = IrodsStreamWrapper.inc

@@ -40,24 +40,10 @@ function add_to_managed_list(&$entity, $context = array()){
         $image_file_name = substr($node->field_leaf_image_file['und'][0]['uri'], $slash_index+1);
 
         // Create a file object to associate to the managed image file field
-
-/*
-        $file = new stdClass();
-        $file->uid = $node->uid;
-        $file->filename = $image_file_name;
-        $file->uri = 'rods://managed_images/'.$user->name.'/'.$image_file_name;
-        watchdog("add managed images", $file->uri );
-        $file->filemime = file_get_mimetype($file->uri);
-        $file->status = 1;
-        $file->display = 1;
-        $file->description = "";
-        $file = file_save($file);
-
-*/
-        $web_root = file_stream_wrapper_get_instance_by_uri('rods://')->realpath();
-        if(!is_dir($web_root.'/managed_images/'.$user->name)){
-            $cmmd = 'mkdir '.$web_root.'/managed_images/'.$user->name;
-            shell_exec($cmmd);
+        if( ! is_dir("rods://managed_images/" . $user->name) ) {
+            /* replacement for shell_exec() and POSIX mkdir system function */
+            $irods = file_stream_wrapper_get_instance_by_schema('rods');
+            $irods->mkdir("rods://managed_images/" . $user->name);
         }
         $file = new stdClass();
         $file->uid = $node->uid;
@@ -65,17 +51,15 @@ function add_to_managed_list(&$entity, $context = array()){
         $file->uri = $node->field_leaf_image_file['und'][0]['uri'];
         $file->filemime = file_get_mimetype($file->uri);
         $file->status = 1;
-        $dest = 'rods://managed_images/'.$user->name.'/'.$image_file_name;
+        $dest = 'rods://managed_images/' . $user->name . '/' . $image_file_name;
         $file = file_copy($file, $dest);
 
         $managed_img->field_managed_image_file['und'][0] = (array)$file;
 
         node_save($managed_img);
         $count++;
-        //dpm($node);
-        //drupal_set_message(t('Filename: %filepath', array('%filepath' => $image_file_name)));
-        //drupal_set_message(t('Destination: %filepath', array('%filepath' => $dest)));
     }
+    
     drupal_set_message(t('%count images added to managed list.', array('%count' => $count)));
 }
 

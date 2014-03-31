@@ -740,15 +740,18 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         /* instantiate the parent dir; call PRODS to create the new dir */
         $this->dir = ProdsDir::fromURI($parent_uri, true);
 
-        /* ProdsDir::mkdir returns an instance of ProdsDir,
-         * thus the awkward reassignment... */
-        $this->dir = $this->dir->mkdir($new_directory);
+        try {
+            /* ProdsDir::mkdir returns an instance of ProdsDir,
+             * thus the awkward reassignment... */
+            $this->dir = $this->dir->mkdir($new_directory);
 
-        /*
-         * $recursive = (bool) ($options & STREAM_MKDIR_RECURSIVE);
-         * $localpath = $this->getLocalPath($uri);
-         */
-        return FALSE;
+            /* $recursive = (bool) ($options & STREAM_MKDIR_RECURSIVE);
+             * $localpath = $this->getLocalPath($uri); */
+            return TRUE;
+
+        } catch (Exception $e) {
+            return FALSE;
+        }
     }
 
 
@@ -801,8 +804,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      */
     protected function getLocalPath($uri = NULL)
     {
-        /* set default */
+        /* set backup defaults */
+        $root = '/iplant/home/';
         $username = 'cldb';
+        
         if ( variable_get('irods_username', 0) ) {
             $username = variable_get($variable_name);
 
@@ -811,11 +816,19 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                 $username = 'cldb';
             }
         }
-
-        return '/iplant/home/'
-               . $username
-               . '/'
-               . trim(str_replace('rods://', '', $uri), '/');
+        
+        if ( variable_get('irods_root', 0) ) {
+            $root = variable_get('irods_root');
+            
+            /* make sure its not empty */
+            if ( ! strlen('irods_root') > 0) {
+                $root = '/iplant/home/';
+            }
+        }
+        
+        return 
+            $root . $username . '/'
+            . trim(str_replace('rods://', '', $uri), '/');
     }
 
 
@@ -842,11 +855,12 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
             $this->dir = ProdsDir::fromURI($full_uri, true);
             $stats = $this->dir->getStats();
 
+            /* 040000 is vital; else it never works */
             return array (
-                -1, -1, -1, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
+                -1, -1, 040000, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
                 'dev' => -1,
                 'ino' => -1,
-                'mode' => -1,
+                'mode' => 040000,
                 'nlink' => -1,
                 'uid' => -1,
                 'gid' => -1,
@@ -860,18 +874,18 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
             );
 
         } catch(Exception $e) {
-            /* try to see if its a directory instead. */
+            /* try to see if its a file instead. */
             try {
                 /* stat over streams won't call stream_open() first,
                  * so we need to init $this->file here. */
-                $this->dir = ProdsDir::fromURI($full_uri, true);
-                $stats = $this->dir->getStats();
+                $this->file = ProdsFile::fromURI($full_uri, true);
+                $stats = $this->file->getStats();
 
                 return array (
-                    -1, -1, -1, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
+                    -1, -1, 0100000, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
                     'dev' => -1,
                     'ino' => -1,
-                    'mode' => -1,
+                    'mode' => 0100000,
                     'nlink' => -1,
                     'uid' => -1,
                     'gid' => -1,
@@ -930,8 +944,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         /* if the domain is set in the site's config, get it; otherwise use the
          * built-in defaults above */
         foreach ($irods as $variable) {
-          /* variables names are same as the array key names, but prefixed
-             * with 'irods_' in the config tables in the database. */
+            /* variables names are same as the array key names, but prefixed
+             * with 'irods_' in the config tables in the database.  */
             $variable_name = 'irods_' . $variable;
             if ( variable_get($variable_name, 0) ) {
                 $variable_value = variable_get($variable_name);

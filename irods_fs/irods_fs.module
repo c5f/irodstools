@@ -15,22 +15,22 @@ if ($version_parts[1] >= 3) {
 /*
 
 /* prods should be installed in /sites/all/library/prods */
-if ( ($library = libraries_load('prods')) && !empty($library['loaded']) ) {
-
-
-}
+/*
+if ( ($library = libraries_load('prods')) && !empty($library['loaded']) ) { }
+*/
 
 /**
  * @file
  * Provides iRODS stream wrapper
  */
 
+
 /**
  * Implements hook_stream_wrappers().
  *
  * init a stream wrapper for iRODS, implemented by IrodsStreamWrapper.php
  */
-function irods_fsstream_wrappers() {
+function irods_fs_stream_wrappers() {
   return array(
     'rods' => array(
       'name' => 'iRODS',
@@ -43,29 +43,26 @@ function irods_fsstream_wrappers() {
 /**
  * Implements hook_menu().
  */
-function irods_fsmenu() {
-  $items = array();
+function irods_fs_menu() {
+    $items = array();
+    //??
+    $items['admin/config/media/irods_fs'] = array(
+        'title' => 'iRODS Data Storage',
+        'description' => 'Configure your iRODS credentials and connection',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('irods_fs_admin'),
+        'access arguments' => array('access administration pages'),
+    );
 
-  $items['admin/config/media/irods'] = array(
-    'title' => 'iRODS Data Storage',
-    'description' => 'Configure your iRODS credentials and connection',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('irods_fs_admin'),
-    'access arguments' => array('access administration pages'),
-  );
-
-  return $items;
+    return $items;
 }
 
-/**
- * Implements hook_help().
- */
-function irods_fs_help($path, $arg) {
-    switch ($path) {
-        case 'admin/config/media/irods':
-            return '<p>' . t('') . '</p>';
-  }
+/*
+function irods_fs_form($form, &$form_state) {
+
 }
+*/
+
 
 /**
  * Implements hook_admin().
@@ -145,7 +142,6 @@ function irods_fs_admin_validate($form, &$form_state)
     catch(Exception $e) {
       form_set_error('irods_fs', t('There was a problem using iRODS'));
     }
-  }
 }
 
 
@@ -179,6 +175,9 @@ function hook_file_delete() {}
 function hook_file_insert() {}
 function hook_file_download() {}
 
+/**
+ * Implements hook_help().
+ */
 function irods_fs_help($path, $arg) {
     return '<p>' . t("Help message") . '</p>';
 }
