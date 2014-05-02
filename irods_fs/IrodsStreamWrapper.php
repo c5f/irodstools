@@ -1,9 +1,10 @@
 <?php
-
 /**
  * @file
  * Drupal stream wrapper implementation for iRODS
- *
+ */
+
+/**
  * Implements DrupalStreamWrapperInterface to provide an iRODS wrapper with
  * the rods:// prefix
  */
@@ -37,9 +38,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     private $file;
 
     /**
-     * @var string    Referenced as "irods://..." to distinguish it from the
-     * 				  PRODS': "rods://" which me thinks to be counterintuitive
-     * 				  at this point
+     * @var string    Referenced as "rods://..."
      */
     protected $uri;
 
@@ -79,7 +78,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Sets the stream resource URI.
      *
-     * URIs are formatted as "irods://username:password@domain:1247/managed_images/"
+     * URIs are formatted as "rods://username:password@domain:1247/managed_images/"
      *
      * This allows you to set the URI. Generally is only called by the factory
      * method.
@@ -96,7 +95,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Returns the stream resource URI.
      *
-     * URIs are formatted as "irods://username:password@domain:1247/managed_images/"
+     * URIs are formatted as "rods://username:password@domain:1247/managed_images/"
      *
      * @return  Returns the current URI of the instance.
      */
@@ -120,16 +119,14 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      * Returns a web accessible URL for the resource.
      *
      * This function should return a URL that can be embedded in a web page
-     * and accessed from a browser. For example, the external URL of
-     * "youtube://xIpLd0WQKCY" might be
-     * "http://www.youtube.com/watch?v=xIpLd0WQKCY".
+     * and accessed from a browser.
      *
      * @return
      *   Returns a string containing a web accessible URL for the resource.
      */
     public function getExternalUrl($uri = NULL)
     {
-        // There could be security problems with this if we include the password in the url...
+        /* There could be security problems with this if we include the password in the url */
         return $this->getBaseURI($uri);
     }
 
@@ -145,7 +142,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      */
     public static function getMimeType($uri, $mapping = NULL)
     {
-        // Load the default file map
+        /* Load the default file map */
         if ( ! isset(self::$mapping) ) {
             include_once DRUPAL_ROOT . '/includes/file.mimetypes.inc';
 
@@ -155,15 +152,16 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         $extension = '';
         $file_parts = explode('.', basename($uri));
 
-        // Remove the first part: a full filename should not match an extension.
+        /* Remove the first part: a full filename should not match an extension */
         array_shift($file_parts);
 
-        // Iterate over the file parts, trying to find a match.
-        // For my.awesome.image.jpeg, we try:
-        //   - jpeg
-        //   - image.jpeg, and
-        //   - awesome.image.jpeg
-        while ($additional_part = array_pop($file_parts)) {
+        /* Iterate over the file parts, trying to find a match.
+         * For my.awesome.image.jpeg, we try:
+         *   - jpeg
+         *   - image.jpeg, and
+         *   - awesome.image.jpeg
+         */
+        while ( $additional_part = array_pop($file_parts) ) {
             $extension = strtolower($additional_part . ($extension ? '.' . $extension : ''));
 
             if ( isset(self::$mapping['extensions'][$extension]) ) {
@@ -176,8 +174,6 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
 
     /**
-     * @TODO
-     *
      * Returns the local writable target of the resource within the stream.
      *
      * This function should be used in place of calls to realpath() or similar
@@ -195,7 +191,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      */
     protected function getTarget($uri = NULL)
     {
-        if (!isset($uri)) {
+        if ( ! isset($uri) ) {
             $uri = $this->uri;
         }
 
@@ -209,14 +205,13 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * Changes permissions of the resource.
      *
-     * Do we even need chmod in iRODS??
+     * @TODO Do we even need chmod in iRODS??
      *
      * @param $mode
      *   Integer value for the permissions. Consult PHP chmod() documentation
      *   for more information.
      *
-     * @return
-     *   Returns TRUE on success or FALSE on failure.
+     * @return TRUE on success or FALSE on failure.
      */
     public function chmod($mode)
     {
@@ -245,8 +240,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      * @param $uri
      *   An optional URI.
      *
-     * @return
-     *   A string containing the directory name, or FALSE if not applicable.
+     * @return String containing the directory name, or FALSE if not applicable.
      *
      * @see drupal_dirname()
      */
@@ -277,8 +271,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
      * @param $opened_path
      *   A string containing the path actually opened.
      *
-     * @return
-     *   Returns TRUE if file was opened successfully.
+     * @return TRUE if file was opened successfully.
      *
      * @see http://php.net/manual/en/streamwrapper.stream-open.php
      */
@@ -287,8 +280,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         $full_uri = $this->uri . str_replace('rods://', '', $uri);
             // $this->uri already has a trailing slash
 
-        /*
-         * parse the url to pass to RODSAccount and ProdsFile, since
+        /* parse the url to pass to RODSAccount and ProdsFile, since
          * ProdsFile::fromUri() will not have all the needed permission rules
          * firing on it; explicitly creating a RODSAccount then ProdsFile
          * does work...
@@ -300,7 +292,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                 $url_parts['host'], $url_parts['port'], $url_parts['user'], $url_parts['pass']
             );
             $this->file = new ProdsFile($this->account, $url_parts['path']);
-            //$this->file = ProdsFile::fromUri($full_uri);
+
+            //Or, this replaces the above 4 lines: $this->file = ProdsFile::fromUri($full_uri);
             $this->file->open($mode);
 
             /* set the file's position */
@@ -557,12 +550,11 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     /**
      * feof() handler.
      *
-     * @access private
      * @return bool 	TRUE if end-of-file has been reached.
      *
      * @see http://php.net/manual/en/streamwrapper.stream-eof.php
      */
-    function stream_eof()
+    public function stream_eof()
     {
         try {
             $stats = $this->file->getStats();
@@ -592,9 +584,9 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         try {
             /* unlink over streams don't call stream_open() first,
              * so we need to init $this->file here.
-             * See: https://bugs.php.net/bug.php?id=40459 */
-            //was fixed in PHP 5.4.7, and later (Sept, 2012), per PHP Changelog
-
+             * See: https://bugs.php.net/bug.php?id=40459
+             * this is fixed in PHP 5.4.7, and later (Sept, 2012), per PHP Changelog
+             */
             $this->file = ProdsFile::fromURI($uri);
 
             $this->file->unlink();
@@ -807,7 +799,7 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
         /* set backup defaults */
         $root = '/iplant/home/';
         $username = 'cldb';
-        
+
         if ( variable_get('irods_username', 0) ) {
             $username = variable_get($variable_name);
 
@@ -816,17 +808,17 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                 $username = 'cldb';
             }
         }
-        
+
         if ( variable_get('irods_root', 0) ) {
             $root = variable_get('irods_root');
-            
+
             /* make sure its not empty */
             if ( ! strlen('irods_root') > 0) {
                 $root = '/iplant/home/';
             }
         }
-        
-        return 
+
+        return
             $root . $username . '/'
             . trim(str_replace('rods://', '', $uri), '/');
     }
@@ -872,8 +864,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                 'blksize' => -1,
                 'blocks' => -1,
             );
-
-        } catch(Exception $e) {
+        }
+        catch(Exception $e) {
             /* try to see if its a file instead. */
             try {
                 /* stat over streams won't call stream_open() first,
@@ -897,8 +889,8 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                     'blksize' => -1,
                     'blocks' => -1,
                 );
-
-            } catch (Exception $e) {
+            }
+            catch (Exception $e) {
                 trigger_error("Got an exception:$e", E_USER_WARNING);
 
                 return array (
@@ -934,10 +926,11 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
     {
         /* Defaults */
         $irods = array();
+
         $irods['schema'] 	= 'rods://';
-        $irods['username'] 	= 'cldb';
-        $irods['password'] 	= 'ClearLeave$1989';
-        $irods['host'] 	= 'data.iplantcollaborative.org';
+        $irods['username'] 	= '';
+        $irods['password'] 	= '';
+        $irods['host'] 	    = 'data.iplantcollaborative.org';
         $irods['port'] 		= '1247';
         $irods['root'] 		= 'iplant/home/' . $irods['username'];
 
