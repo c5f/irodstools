@@ -4,13 +4,14 @@ Module irods_fs
 
 Dependencies
 ------------
-PRODS library from RENCI. Installed in sites/all/libraries.
+PRODS library from RENCI.
 
 Requirements
 ------------
 You will need in your PHP settings:
 * set `allow_url_fopen` to `on`
 * fopen wrappers must be enabled
+* PHP's curl extension must be installed.
 
 Drupal Settings
 ---------------
