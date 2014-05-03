@@ -28,6 +28,7 @@ function irods_fs_stream_wrappers() {
             'name' => 'iRODS',
             'class' => 'IrodsStreamWrapper',
             'description' => t('iRODS Data Storage'),
+            'type' => STREAM_WRAPPERS_WRITE_VISIBLE,
         ),
     );
 }
