@@ -8,3 +8,4 @@ configure = admin/config/media
 
 files[] = irods_fs.module
 files[] = IrodsStreamWrapper.inc
+files[] = prods/autoload.inc.php
