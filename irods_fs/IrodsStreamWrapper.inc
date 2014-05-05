@@ -849,10 +849,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
 
             /* 040000 is vital; else it never works */
             return array (
-                -1, -1, 040000, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
+                -1, -1, 040755, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
                 'dev' => -1,
                 'ino' => -1,
-                'mode' => 040000,
+                'mode' => 040755,
                 'nlink' => -1,
                 'uid' => -1,
                 'gid' => -1,
@@ -874,10 +874,10 @@ class IrodsStreamWrapper implements DrupalStreamWrapperInterface
                 $stats = $this->file->getStats();
 
                 return array (
-                    -1, -1, 0100000, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
+                    -1, -1, 0100644, -1, -1, -1, $stats->size, time (), $stats->mtime, $stats->ctime, -1, -1,
                     'dev' => -1,
                     'ino' => -1,
-                    'mode' => 0100000,
+                    'mode' => 0100644,
                     'nlink' => -1,
                     'uid' => -1,
                     'gid' => -1,
