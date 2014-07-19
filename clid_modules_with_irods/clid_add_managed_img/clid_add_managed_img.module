@@ -1,0 +1,65 @@
+<?php
+// $Id: clid_add_managed_img.module
+
+
+function clid_add_managed_img_action_info(){
+    return array(
+        'add_to_managed_list' => array(
+        'label' => t('Add to managed list'),
+        'type' => 'node',
+        'configurable' => FALSE,
+        'hooks' => array(
+            'any' => TRUE,
+          ),
+          // Set to TRUE if you want to operate on an array of identifiers
+          // Set to FALSE if you want to operate on each separately as an object
+          'aggregate' => TRUE,
+        ),
+    );
+}
+
+function add_to_managed_list(&$entity, $context = array()){
+    global $user;
+    $count = 0;
+    foreach($entity as $node){
+        $managed_img = new stdClass();
+        $managed_img->type = 'managed_image';
+        node_object_prepare($managed_img);
+
+        $managed_img->title = $node->title;
+        $managed_img->field_managed_image_id['und'][0]['value'] = $node->field_leaf_image_id['und'][0]['value'];
+        $managed_img->field_managed_image_parent['und'][0]['value'] = $node->nid;
+        if(count($node->field_leaf_image_family) > 0){
+            $managed_img->field_managed_image_family['und'][0]['value'] = $node->field_leaf_image_family['und'][0]['value'];
+            $managed_img->field_managed_image_genus['und'][0]['value'] = $node->field_leaf_image_genus['und'][0]['value'];
+            $managed_img->field_managed_image_species['und'][0]['value'] = $node->field_leaf_image_species['und'][0]['value'];
+
+        }
+        // get the filename from the node
+        $slash_index= strripos($node->field_leaf_image_file['und'][0]['uri'], "/");
+        $image_file_name = substr($node->field_leaf_image_file['und'][0]['uri'], $slash_index+1);
+
+        // Create a file object to associate to the managed image file field
+        if( ! is_dir("rods://managed_images/" . $user->name) ) {
+            /* replacement for shell_exec() and POSIX mkdir system function */
+            $irods = file_stream_wrapper_get_instance_by_scheme('rods');
+            $irods->mkdir("rods://managed_images/" . $user->name);
+        }
+        $file = new stdClass();
+        $file->uid = $node->uid;
+        $file->filename = $image_file_name;
+        $file->uri = $node->field_leaf_image_file['und'][0]['uri'];
+        $file->filemime = file_get_mimetype($file->uri);
+        $file->status = 1;
+        $dest = 'rods://managed_images/' . $user->name . '/' . $image_file_name;
+        $file = file_copy($file, $dest);
+
+        $managed_img->field_managed_image_file['und'][0] = (array)$file;
+
+        node_save($managed_img);
+        $count++;
+    }
+
+    drupal_set_message(t('%count images added to managed list.', array('%count' => $count)));
+}
+

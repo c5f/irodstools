@@ -1,0 +1,388 @@
+<?php
+/**
+* This module triggers a background process to read the uploaded metadata file for the cleared leaf
+* image collection, search for the image in the database and update it's metadata.
+*/
+
+/**
+ * This method implements hook_rules_action_info()  
+ * 
+ */
+function clid_upload_metadata_rules_action_info() {
+ 	$actions = array(
+		'clid_process_metadata_background' => array(
+			'label' => t('CLID Process Collection Metadata File'),
+			'group' => t('CLID BG_Process'),
+			'parameter' => array(
+				'run' => array(
+					'type' => 'node',
+					'label' => t('CLID Collection Metadata Node'),
+				),
+			),
+		),
+	);
+	return $actions;
+ }
+ 
+ /**
+  * This method prepares the module to start the process. It reads details from the node
+  * and passes the file name and location as well as the collection id to the subsequent method 
+  * to take the action.
+  */
+ 
+ function clid_process_metadata_background($run){
+ 	$meta_name = $run->title;
+ 	$meta_id = $run->nid;
+ 	
+	//Create an object to pass to the background_process_start method
+	$batch_details = new stdClass();
+	$batch_details->meta_node_name = $meta_name;
+	$batch_details->meta_nid = $meta_id;
+	 
+	$handle = background_process_start('process_coll_metadata', "clid_upload_metadata", $batch_details);  	
+ 	
+ }
+ 
+ /**
+  * This method reads the uploaded excel or csv file.
+  * Searches the database with image name for the given collection. Loads the image node and updates 
+  * the node with uploaded information and finally saves the node.
+  */
+ 
+ function process_coll_metadata($var1, $batch_details){
+ 	//load the metadata node
+ 	$meta_node = node_load($batch_details->meta_nid);
+ 	$matadata_file = $meta_node->field_metadata_file['und'][0]['uri'];
+ 	$collection_nid = $meta_node->field_meta_image_collection['und'][0]['target_id'];
+ 	$file_realpath = drupal_realpath($matadata_file);
+ 	
+ 	$msg = "Collection Name:".$meta_node->title." Metadata File: ".$matadata_file ." Collection ID:".$collection_nid." Web File Root:".$file_realpath;
+  	watchdog($var1, $msg);
+ 	
+ 	//read the excel or csv file
+	require_once "Classes/PHPExcel.php"; 
+	$objPHPExcel = new PHPExcel();
+	$csvFile = '';
+	$excelFile = '';
+	
+	if(stripos($file_realpath, '.csv') !== false){
+		$csvFile = true;
+	}elseif(stripos($file_realpath, '.xls') !== false){
+		$excelFile = true;
+	}
+	
+	if($csvFile){
+		//watchdog($var1, "Reading CSV file");
+		//load csv file
+		$objReader = PHPExcel_IOFactory::createReader('CSV');		
+		$objReader->setDelimiter(',');
+		$objReader->setEnclosure('');
+		$objReader->setLineEnding("\r\n");
+		$objReader->setSheetIndex(0);
+		$objPHPExcel = $objReader->load($file_realpath);
+	}elseif($excelFile){
+		//watchdog($var1, "Reading Excel File");
+		//load excel file
+		$objReader = PHPExcel_IOFactory::createReader('Excel5');		
+		$objReader->setReadDataOnly(true);
+		$objPHPExcel = $objReader->load($file_realpath);
+	}
+
+	$objWorksheet = $objPHPExcel->getActiveSheet();	
+	
+	//Loop through the worksheet read each line, based on the image name load the image node from the database
+	//update the loaded image node with the information from the uploaded file.
+ 	foreach ($objWorksheet->getRowIterator() as $row) {
+	  if($row->getRowIndex() == 1){
+	  	continue;
+	  }
+	 
+	  $row_detail = new stdClass(); // Information read for each row from the excel file
+	   
+	  $img_file_name = $objWorksheet->getCellByColumnAndRow(0,$row->getRowIndex())->getValue();
+	  $image_num = $objWorksheet->getCellByColumnAndRow(1,$row->getRowIndex())->getValue();
+	  $p_family = $objWorksheet->getCellByColumnAndRow(2,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->p_family = $p_family;
+	  
+	  $is_photo = $objWorksheet->getCellByColumnAndRow(3,$row->getRowIndex())->getValue();
+	  
+	  if(strlen($is_photo) !== 0 and strcmp($is_photo, "*") !== 0){
+	  	$row_detail->is_photo = true;
+	  }else{
+	  	$row_detail->is_photo = false;
+	  }
+	  
+	  $suffix = $objWorksheet->getCellByColumnAndRow(4,$row->getRowIndex())->getValue();
+	  $housed = $objWorksheet->getCellByColumnAndRow(5,$row->getRowIndex())->getValue();
+	  
+	  if(strlen($housed) !== 0){
+	  	$row_detail->housed = true;
+	  }else{
+	  	$row_detail->housed = false;
+	  }
+	  
+	  $a_family = $objWorksheet->getCellByColumnAndRow(6,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->a_family = $a_family;
+	  
+	  $p_genus = $objWorksheet->getCellByColumnAndRow(7,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->p_genus = $p_genus;
+	  
+	  $a_genus = $objWorksheet->getCellByColumnAndRow(8,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->a_genus = $a_genus;
+	  
+	  $species = $objWorksheet->getCellByColumnAndRow(9,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->species = $species;
+	  
+	  $log_msg = $img_file_name."-".$image_num."-".$p_family."-".$suffix."-".$a_genus."-".$species;
+	  //watchdog($var1, $log_msg);
+	  
+	  $collector = $objWorksheet->getCellByColumnAndRow(10,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->collector = $collector;
+	  
+	  $locality = $objWorksheet->getCellByColumnAndRow(11,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->locality = $locality;
+	  
+	  $country = $objWorksheet->getCellByColumnAndRow(12,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->country = $country;
+	  
+	  $elevation = $objWorksheet->getCellByColumnAndRow(13,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->elevation = $elevation;
+	  
+	  $condition = $objWorksheet->getCellByColumnAndRow(14,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->condition = $condition;
+	  
+	  $herbarium_num = $objWorksheet->getCellByColumnAndRow(15,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->herbarium_num = $herbarium_num;
+	  
+	  $comment = $objWorksheet->getCellByColumnAndRow(16,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->comment = $comment;
+	  
+	  $phylum = $objWorksheet->getCellByColumnAndRow(17,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->phylum = $phylum;
+	  
+	  $img_class = $objWorksheet->getCellByColumnAndRow(18,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->img_class = $img_class;
+	  
+	  $subclass = $objWorksheet->getCellByColumnAndRow(19,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->subclass = $subclass;
+	  
+	  $order = $objWorksheet->getCellByColumnAndRow(20,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->order = $order;
+	  
+	  $suborder = $objWorksheet->getCellByColumnAndRow(21,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->suborder = $suborder;
+	  
+	  $superfamily = $objWorksheet->getCellByColumnAndRow(22,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->superfamily = $superfamily;
+	  
+	  $subfamily = $objWorksheet->getCellByColumnAndRow(23,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->subfamily = $subfamily;
+	  
+	  $subgenus = $objWorksheet->getCellByColumnAndRow(24,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->subgenus = $subgenus;
+	  
+	  $subspecies = $objWorksheet->getCellByColumnAndRow(25,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->subspecies = $subspecies;
+	  
+	  $modifier = $objWorksheet->getCellByColumnAndRow(26,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->modifier = $modifier;
+	  
+	  $specimen_num = $objWorksheet->getCellByColumnAndRow(27,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->specimen_num = $specimen_num;
+	  
+	  $herb_url = $objWorksheet->getCellByColumnAndRow(28,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->herb_url = $herb_url;
+	  
+	  $blade_margin = $objWorksheet->getCellByColumnAndRow(29,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->blade_margin = $blade_margin;
+	  
+	  $blade_shape = $objWorksheet->getCellByColumnAndRow(30,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->blade_shape = $blade_shape;
+	  
+	  $period = $objWorksheet->getCellByColumnAndRow(31,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->period = $period;
+	  
+	  $epoch = $objWorksheet->getCellByColumnAndRow(32,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->epoch = $epoch;
+	  
+	  $era = $objWorksheet->getCellByColumnAndRow(33,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->era = $era;
+	  
+	  $group = $objWorksheet->getCellByColumnAndRow(34,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->group = $group;
+	  
+	  $taxa_author = $objWorksheet->getCellByColumnAndRow(35,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->taxa_author = $taxa_author;
+	  
+	  $type = $objWorksheet->getCellByColumnAndRow(36,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->type = $type;
+	  
+	  $stage = $objWorksheet->getCellByColumnAndRow(37,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->stage = $stage;
+	  
+	  $contact = $objWorksheet->getCellByColumnAndRow(38,$row->getRowIndex())->getValue();
+	  
+	  $row_detail->contact = $contact;	  
+
+	  $resolution = $objWorksheet->getCellByColumnAndRow(39,$row->getRowIndex())->getValue();
+	  $row_detail->resolution = $resolution;	 	  
+	  
+	  if(strlen($img_file_name) == 0){
+		  //if suffix has any value; for each value of the suffix append it to the image_num and search for 
+		  //that image number in the database
+		  if(strlen($suffix) !== 0){
+		  	$suf_array = explode(",", $suffix);
+		  	foreach($suf_array as $u_suffix){
+		  		$node_title = $image_num.$u_suffix.".jpg";
+		  		//load this image 
+		  		$match_nid = search_image_with_title($node_title,$collection_nid);
+		  		//Load the node
+		  		if($match_nid !== 0){
+		  			$node = node_load($match_nid);
+		  			update_node($node, $row_detail);
+		  		}
+						  		
+		  	}
+		  }else{
+		  	//If no suffix load the image with the title as only image_num.jpg
+		  	//load the image with this title
+		  	$node_title = $image_num.".jpg";
+		  	$match_nid = search_image_with_title($node_title,$collection_nid);
+	  		if($match_nid !== 0){
+	  			$node = node_load($match_nid);
+	  			update_node($node, $row_detail);
+	  		}
+		  }
+	   }else{
+   		 //search for node id with img_file_name
+   		 $match_nid = search_image_with_title($img_file_name,$collection_nid);
+  		 if($match_nid !== 0){
+  			$node = node_load($match_nid);
+  			update_node($node, $row_detail);
+  		 }
+	   }
+	  
+ 	} //End of loop - reading the worksheet
+	
+	//After processing the uploaded file delete the file and metadata content
+	//unlink($file_realpath);
+	node_delete($batch_details->meta_nid);
+ }
+
+ /**
+  * This method runs the database query with the given image title and collection id and returns the nid
+  */
+ function search_image_with_title($img_title, $collection_id){
+ 	$sql = "select om.etid from og_membership om
+ 			where om.gid=(select o.gid from og o where o.etid='".$collection_id."') and
+ 			om.entity_type='node' and 
+ 			om.etid=(select n.nid from node n where n.type='leaf_image' and n.title='".$img_title."' LIMIT 1)";
+ 	$result = db_query($sql);
+ 	
+ 	//Check the number of rows returned
+ 	if($result->rowCount() == 1){
+	 	foreach ($result as $leaf_image){
+	 		return $leaf_image->etid;
+	 	}
+ 	}else{
+ 		return 0;
+ 	}
+ }
+ 
+ function update_node($node, $new_detail){
+ 	if(strlen($new_detail->phylum) !== 0){$node->field_leaf_image_phylum['und'][0]['value'] = $new_detail->phylum;}
+ 	if(strlen($new_detail->img_class) !== 0){$node->field_leaf_image_class['und'][0]['value'] = $new_detail->img_class;}
+ 	if(strlen($new_detail->subclass) !== 0){$node->field_leaf_image_subclass['und'][0]['value'] = $new_detail->subclass;}
+ 	if(strlen($new_detail->order) !== 0){$node->field_leaf_image_order['und'][0]['value'] = $new_detail->order;}
+ 	if(strlen($new_detail->suborder) !== 0){$node->field_leaf_image_suborder['und'][0]['value'] = $new_detail->suborder;}
+ 	if(strlen($new_detail->superfamily) !== 0){$node->field_leaf_image_super_family['und'][0]['value'] = $new_detail->superfamily;}
+ 	if(strlen($new_detail->p_family) !== 0){$node->field_leaf_image_family['und'][0]['value'] = $new_detail->p_family;}
+ 	if(strlen($new_detail->a_family) !== 0){$node->field_leaf_image_alt_family['und'][0]['value'] = $new_detail->a_family;}
+ 	if(strlen($new_detail->subfamily) !== 0){$node->field_leaf_image_subfamily['und'][0]['value'] = $new_detail->subfamily;}
+ 	if(strlen($new_detail->p_genus) !== 0){$node->field_leaf_image_genus['und'][0]['value'] = $new_detail->p_genus;}
+ 	if(strlen($new_detail->a_genus) !== 0){$node->field_leaf_image_alt_genus['und'][0]['value'] = $new_detail->a_genus;}
+ 	if(strlen($new_detail->subgenus) !== 0){$node->field_leaf_image_subgenus['und'][0]['value'] = $new_detail->subgenus;}
+ 	if(strlen($new_detail->species) !== 0){$node->field_leaf_image_species['und'][0]['value'] = $new_detail->species;}
+ 	if(strlen($new_detail->subspecies) !== 0){$node->field_leaf_image_subspecies['und'][0]['value'] = $new_detail->subspecies;}
+ 	if($new_detail->is_photo){
+ 		$node->field_leaf_image_photographed['und'][0]['value'] = 1;
+ 	}else{
+ 		$node->field_leaf_image_photographed['und'][0]['value'] = 0;
+ 	}
+  	if($new_detail->housed){
+ 		$node->field_leaf_image_rehoused['und'][0]['value'] = 1;
+ 	}else{
+ 		$node->field_leaf_image_rehoused['und'][0]['value'] = 0;
+ 	} 	
+ 	if(strlen($new_detail->modifier) !== 0){$node->field_leaf_image_modifiers['und'][0]['value'] = $new_detail->modifier;}
+ 	if(strlen($new_detail->taxa_author) !== 0){$node->field_leaf_image_taxon_author['und'][0]['value'] = $new_detail->taxa_author;}
+ 	if(strlen($new_detail->era) !== 0){$node->field_leaf_image_era['und'][0]['value'] = $new_detail->era;}
+ 	if(strlen($new_detail->period) !== 0){$node->field_leaf_image_period['und'][0]['value'] = $new_detail->period;}
+ 	if(strlen($new_detail->epoch) !== 0){$node->field_leaf_image_epoch['und'][0]['value'] = $new_detail->epoch;}
+ 	if(strlen($new_detail->stage) !== 0){$node->field_leaf_image_stage['und'][0]['value'] = $new_detail->stage;}
+ 	if(strlen($new_detail->herbarium_num) !== 0){$node->field_leaf_image_herbarium_id['und'][0]['value'] = $new_detail->herbarium_num;}
+ 	if(strlen($new_detail->herb_url) !== 0){$node->field_leaf_image_herbarium_url['und'][0]['value'] = $new_detail->herb_url;}
+ 	if(strlen($new_detail->group) !== 0){$node->field_leaf_image_group['und'][0]['value'] = $new_detail->group;}
+ 	if(strlen($new_detail->type) !== 0){$node->field_leaf_image_type['und'][0]['value'] = $new_detail->type;}
+ 	if(strlen($new_detail->specimen_num) !== 0){$node->field_leaf_image_specimen_number['und'][0]['value'] = $new_detail->specimen_num;}
+ 	if(strlen($new_detail->blade_shape) !== 0){$node->field_leaf_image_blade_shape['und'][0]['value'] = $new_detail->blade_shape;}
+ 	if(strlen($new_detail->blade_margin) !== 0){$node->field_leaf_image_blade_margin['und'][0]['value'] = $new_detail->blade_margin;}
+ 	if(strlen($new_detail->collector) !== 0){$node->field_leaf_image_collector['und'][0]['value'] = $new_detail->collector;}
+ 	if(strlen($new_detail->locality) !== 0){$node->field_leaf_image_locality['und'][0]['value'] = $new_detail->locality;}
+ 	if(strlen($new_detail->country) !== 0){$node->field_leaf_image_country['und'][0]['value'] = $new_detail->country;}
+ 	if(strlen($new_detail->elevation) !== 0){$node->field_leaf_image_elevation['und'][0]['value'] = $new_detail->elevation;}
+ 	if(strlen($new_detail->condition) !== 0){$node->field_leaf_image_condition['und'][0]['value'] = $new_detail->condition;}
+ 	if(strlen($new_detail->comment) !== 0){$node->field_leaf_image_comments['und'][0]['value'] = $new_detail->comment;}
+ 	if(strlen($new_detail->contact) !== 0){$node->field_leaf_image_contact['und'][0]['value'] = $new_detail->contact;}
+ 	if(strlen($new_detail->resolution) !== 0){$node->field_leaf_image_resolution['und'][0]['value'] = $new_detail->resolution;}
+ 	//Save the node
+ 	node_save($node);
+ }
+ 
+ /**
+  * This function is not used
+  */
+ function get_collection_members($collection_id){
+ 	watchdog("CLID Gettig images for collection: ", $collection_id);
+  	$query = new EntityFieldQuery();
+ 	$query->entityCondition('entity_type', 'og')
+ 		->fieldCondition('etid', $collection_id, '=');
+ 	$result = $query->execute();
+ 	if(isset($result['og'])){
+ 		$gid = array_keys($result['og']);
+ 		watchdog("GID Retrieved", $gid);
+ 	} 	
+ }

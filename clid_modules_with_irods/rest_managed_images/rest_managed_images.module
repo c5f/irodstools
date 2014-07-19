@@ -1,0 +1,179 @@
+<?php
+// $Id$
+// REST api to retrieve metadata of managed images
+/************************************************************************************************
+* @file
+* rest_managed_images.module
+* This module provides REST API to retrieve matadata of the images in the managed list
+*
+*/
+
+/**
+* Log Messages to the server error log
+*/
+
+function log_message($msg){
+	$msg = $msg."\n";
+	$Y = 1;
+	if($Y == 1)	{
+		watchdog('rest_managed_images', $msg, NULL, WATCHDOG_ERROR, NULL);
+		//error_log($msg);
+	}
+}
+
+/***************************************************************************************************
+* Implementation of hook_help().
+*/
+function rest_managed_images_help($path, $arg) {
+  $msg = t('<p>REST API to retrieve metadata of images in the managed list.</p>');
+  
+  switch ($path) {
+    case 'admin/help#rest_managed_images':
+      return $msg;
+    case 'admin/modules#description':
+      return $msg;
+  }
+}
+
+/***************************************************************************************************
+* Implementation of hook_disable()
+* This method is called when a module is disabled, helping to clear the cache
+*/
+function rest_managed_images_disable() {
+  cache_clear_all('services:methods', 'cache');
+  log_message( '------- rest_managed_images_disable() called!--------' );
+}
+
+/***************************************************************************************************
+* Implementation of hook_enable()
+* This method is called when a module is enabled, helping to clear the cache
+*/
+function rest_managed_images_enable() {
+  cache_clear_all('services:methods', 'cache');
+  log_message( '------- rest_managed_images_enable() called!--------' );
+}
+
+/***************************************************************************************************
+* Implementation of hook_perm().
+* @return An array of the valid permission names for this module
+*/
+function rest_managed_images_permission() {
+  return array(
+  	'REST Managed List View Own'=> array(
+      'title' => t('Get own managed list'), 
+      'description' => t('Managed list service to get own images.'),
+    ),
+  );
+}
+
+/***************************************************************************************************
+ * Implementation of hook_services_resources().
+ */
+function rest_managed_images_services_resources() {
+  log_message('------- rest_managed_images_services_resources() called! ---------');
+  return array(
+   'managed_images' => array(
+	 'retrieve' => array( 'help'                    => 'Retrieves list of managed images',
+						  'callback'                => 'rest_managed_images_list_retrieve',
+						  'access callback'         => 'rest_managed_images_list_access',
+						  'access arguments'        => array('view'),
+						  'access arguments append' => TRUE,
+						  'args' => array( array( 'name' => 'id',
+												  'type' => 'string',
+												  'description' => 'An user id String',
+												  'source' => array('path' => 0),
+												  'optional' => FALSE,
+												),
+											array( 'name' => 'name',
+												  'type' => 'string',
+												  'description' => 'User password string',
+												  'source' => array('param' => 'pass'),
+												  'optional' => TRUE,
+												),	
+										 ),						  
+      					),
+   					),
+  );
+}
+
+/***************************************************************************************************
+* Access callback for rest managed images resources
+* @param string $op
+*  The operation that is to be performed.
+* @return bool
+*  Whether access is given or not.
+* 
+*/
+function rest_managed_images_list_access($op, $args){
+	global $user;
+	$access = FALSE;
+	$u_id = $args[0];
+	$passwd = $args[1];
+	
+	  
+	if($user->uid == 0){
+		$user_id = user_authenticate($u_id, $passwd);
+		$user = user_load($user_id);
+	}
+	log_message('---------- rest_managed_images_list_access: user id is "'.$user->uid.'" ---------');
+	switch ($op) {
+		case 'view':
+			if($user)$access = TRUE;
+		  	break;
+	}
+
+	if (!$access) $accessStr='false';
+	else $accessStr='true';
+	log_message(' --------- rest_managed_images_list_access: op is "'.print_r($op,1).'" and access is "'.$accessStr.'" ------------');
+  
+	return $access;
+}
+
+/***************************************************************************************************
+*
+* Callback to get list of managed images
+*/
+function rest_managed_images_list_retrieve($arg){
+	global $user;
+	log_message('--------- rest_managed_images_list_retrieve() called for user'.$user->uid.'!----------pass');
+	
+	$image_list = array();
+	// use EntityFieldQuery API to get the list of managed images for a user
+	$query = new EntityFieldQuery();
+	$query->entityCondition('entity_type', 'node')
+  			->propertyCondition('type', 'managed_image')
+  			->propertyCondition('status', 1)
+  			->propertyCondition('uid', $user->uid); // Run the query for the user.
+
+	$result = $query->execute();
+
+	if (isset($result['node'])) {
+	  $managed_nids = array_keys($result['node']);
+	  $managed_image_nodes = entity_load('node', $managed_nids);
+	  foreach($managed_image_nodes as $node){
+		//Create new object
+		$n_node = new stdClass();
+		//Get image name
+		$n_node->img_name = $node->title;
+		//get image genus 
+		$n_node->genus = $node->field_managed_image_genus['und'][0]['value'];
+		//get image species
+		$n_node->species = $node->field_managed_image_species['und'][0]['value'];
+		//get image file path
+		$n_node->img_file = $node->field_managed_image_file['und'][0]['uri'];
+		//get parent id of the manged image 
+		$n_node->parent_id = $node->field_managed_image_parent['und'][0]['value'];
+		$image_list[] = $n_node;	  	
+	  }
+	}	
+	log_message('--------- rest_managed_images_list_retrieve() returning '. count($image_list) .' images for user '.$user->uid.'----------');
+	
+	//Logout the user
+	/*
+	$tmp = NULL;
+	session_destroy();
+	user_module_invoke('logout', $tmp, $user);
+	$user = drupal_anonymous_user();
+	*/
+	return $image_list;
+}

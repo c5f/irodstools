@@ -1,0 +1,11 @@
+;$ID$
+;This is a module to accept metadata of images in a collection and update the node info.
+;This module is invoked through 'Rules'. It uses background_process api to run the process
+;in background
+; 
+name = "Process Collection Metadata"
+description = "Clid background process to read the uploaded file and update image metadata."
+core = 7.x
+php = 5.2
+package = Leaf Database
+dependencies[] = rules

@@ -1,6 +1,0 @@
-; $Id$
-name = "iRODS Tools"
-description = "Debugging Tools for the iRODS Monitor Site"
-package = "iRODS Tools"
-core = 7.x
-version = 7.x-1.0

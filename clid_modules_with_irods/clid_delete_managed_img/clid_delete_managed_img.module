@@ -1,0 +1,39 @@
+<?php
+// $Id: clid_delete_managed_img.module
+
+
+function clid_delete_managed_img_action_info(){
+	return array(
+		'delete_from_managed_list' => array(
+		'label' => t('Delete managed images'),
+		'type' => 'node',
+		'configurable' => FALSE,
+		'hooks' => array(
+	        'any' => TRUE,
+	      ),
+	      // Set to TRUE if you want to operate on an array of identifiers
+	      // Set to FALSE if you want to operate on each separately as an object
+	      'aggregate' => TRUE,
+	    ),
+	);
+}
+
+function delete_from_managed_list(&$entity, $context = array()){
+	$count = 0;
+	foreach($entity as $node){
+		//delete file associated to the node before deleting the content
+		// field: field_managed_image_file
+
+		// load the file
+		$file = new stdClass();
+		$file = file_load($node->field_managed_image_file['und'][0]['fid']);
+		// unset the field for the node
+		unset($node->field_managed_image_file['und'][0]);
+		// delete file from disk and from database
+		file_delete($file, TRUE);		
+		node_delete($node->nid);
+		$count++;
+	}
+	//drupal_set_message(t('%count images deleted from managed list.', array('%count' => $count)));
+}
+

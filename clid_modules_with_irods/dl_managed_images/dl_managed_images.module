@@ -1,0 +1,96 @@
+<?php
+// $Id: dl_managed_images.module
+
+
+function dl_managed_images_action_info(){
+	return array(
+		'download_archieve_images' => array(
+		'label' => t('Download managed images'),
+		'type' => 'node',
+		'configurable' => FALSE,
+		'hooks' => array(
+	        'any' => TRUE,
+	      ),
+	      // Set to TRUE if you want to operate on an array of identifiers
+	      // Set to FALSE if you want to operate on each separately as an object
+	      'aggregate' => TRUE,
+	    ),
+	);
+}
+
+function download_archieve_images(&$entity, $context = array()){
+
+	$files = array(); // list fo file names
+
+	//csv file header information
+	$file_content = 'IMAGE FILE NAME,IMAGE ID,PREFERRED FAMILY,ALTERNATE FAMILY,PREFERRED GENUS,ALTERNATE GENUS,SPECIES,'.
+	'COLLECTOR,LOCALITY,COUNTRY,ELEVATION (m),CONDITION,HERBARIUM #,COMMENT,PHYLUM,CLASS,SUBCLASS,ORDER,SUBORDER,SUPER FAMILY,'.
+	'SUBFAMILY,SUBGENUS,SUBSPECIES,MODIFIER,SPECIMEN #,HERBARIUM URL,BLADE MARGIN,BLADE SHAPE,PERIOD,EPOCH,ERA,GROUP,TAXON AUTHOR,'.
+	'TYPE,STAGE,CONTACT'. "\n";
+	foreach($entity as $node){
+		//dpm($node);
+		$slash_index= strripos($node->field_managed_image_file['und'][0]['uri'], "/");
+		$image_file_name = substr($node->field_managed_image_file['und'][0]['uri'], $slash_index+1);
+		//read parent node id, load parent node and read details from parent node.
+		//Add all the fields from the parent node to the excel sheet
+		$parent_nid = $node->field_managed_image_parent['und'][0]['value'];
+		$p_node = node_load($parent_nid);
+
+		$file_content = $file_content.$image_file_name.','.$parent_nid.','.
+		$p_node->field_leaf_image_family['und'][0]['value'].','.
+		$p_node->field_leaf_image_alt_family['und'][0]['value'].','.
+		$p_node->field_leaf_image_genus['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_alt_genus['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_species['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_collector['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_locality['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_country['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_elevation['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_condition['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_herbarium_id['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_comments['und'][0]['value'].','.
+ 		$p_node->field_leaf_image_phylum['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_class['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_subclass['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_order['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_suborder['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_super_family['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_subfamily['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_subgenus['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_subspecies['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_modifiers['und'][0]['value'].','.
+		$p_node->field_leaf_image_specimen_number['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_herbarium_url['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_blade_margin['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_blade_shape['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_period['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_epoch['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_era['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_group['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_taxon_author['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_type['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_stage['und'][0]['value'].','.
+	 	$p_node->field_leaf_image_contact['und'][0]['value']."\n";
+
+
+		//drupal_set_message(t('Called Download image function %filepath', array('%filepath' => $image_file_name)));
+
+		$files[] = $node->field_managed_image_file['und'][0]['uri'];
+	}
+
+	//Create a csv file in the
+	$csv_file = tempnam(file_directory_temp(), 'csv');
+	$fh = fopen($csv_file, 'w');
+	fwrite($fh, $file_content);
+	fclose($fh);
+
+	require_once "File/Archive.php";
+	$php_zip = new File_Archive();
+	$php_zip->setOption('zipCompressionLevel',0);
+	$source = $php_zip->readMulti(array($php_zip->read($csv_file, 'managed_image_metadata.csv'), $php_zip->read($files)));
+	$php_zip->extract($source, $php_zip->toArchive('managed_images.zip',$php_zip->toOutput()));
+	// For single file
+	//File_Archive::extract($files,File_Archive::toArchive('managed_images.zip',File_Archive::toOutput()));
+	exit;
+}
+

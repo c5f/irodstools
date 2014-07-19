@@ -1,0 +1,10 @@
+;$ID$
+; Add selected images to the managed list
+; 
+;
+name = "Add to managed list"
+description = "Add selected images to the managed list"
+core = 7.x
+php = 5.2
+package = Leaf Database
+dependencies[] = views_bulk_operations

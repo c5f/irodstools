@@ -1,0 +1,10 @@
+;$ID$
+; REST api to get list of managed image metadata
+; 
+;
+name = "REST Managed Images"
+description = "RESTful API to retrieve matadata of managed images"
+core = 7.x
+php = 5.2
+package = Leaf Database
+dependencies[] = services

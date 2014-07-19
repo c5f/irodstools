@@ -1,0 +1,10 @@
+;$ID$
+; Downloads user's managed images as an archive file
+; 
+;
+name = "Zip Download Managed Images"
+description = "Download managed images and its metadata as an zip file"
+core = 7.x
+php = 5.2
+package = Leaf Database
+dependencies[] = views_bulk_operations
